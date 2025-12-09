@@ -8,7 +8,10 @@ interface Vec3 {
 }
 
 export function PropertyPanel() {
-  const { selectedAsset, updateAssetTransform, selectionManager } = useScene()
+  const { selectedAsset, assets, updateAssetTransform, selectionManager, toggleAssetGravity } = useScene()
+
+  // Get the current asset from assets array to have reactive disableGravity
+  const currentAsset = selectedAsset ? assets.find(a => a.id === selectedAsset.id) : null
 
   const [position, setPosition] = useState<Vec3>({ x: 0, y: 0, z: 0 })
   const [rotation, setRotation] = useState<Vec3>({ x: 0, y: 0, z: 0 })
@@ -131,6 +134,18 @@ export function PropertyPanel() {
             <Vec3Input value={scale} axis="y" onChange={handleScaleChange} />
             <Vec3Input value={scale} axis="z" onChange={handleScaleChange} />
           </div>
+        </div>
+
+        <div class="property-group">
+          <div class="property-label">Physics</div>
+          <label class="property-checkbox">
+            <input
+              type="checkbox"
+              checked={currentAsset?.disableGravity || false}
+              onChange={() => selectedAsset && toggleAssetGravity(selectedAsset.id)}
+            />
+            <span>Disable Gravity (Kinematic)</span>
+          </label>
         </div>
       </div>
     </div>

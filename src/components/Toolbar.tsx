@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'preact/hooks'
+import { useRef, useEffect, useState } from 'preact/hooks'
 import { useScene } from '../hooks/useScene'
 import { TransformMode } from '../scene/SelectionManager'
 import { exportScene } from '../io/exportScene'
@@ -8,6 +8,7 @@ export function Toolbar() {
   const { transformMode, setTransformMode, assets, addAsset, assetLoader } = useScene()
   const folderInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const [notification, setNotification] = useState<{ message: string; type: 'error' | 'success' } | null>(null)
 
   const modes: { mode: TransformMode; label: string; key: string }[] = [
     { mode: 'translate', label: 'Move', key: 'G' },
@@ -56,9 +57,17 @@ export function Toolbar() {
     input.value = ''
   }
 
+  const showNotification = (message: string, type: 'error' | 'success') => {
+    setNotification({ message, type })
+    setTimeout(() => setNotification(null), 4000)
+  }
+
   const handleExport = async () => {
     if (assets.length === 0) return
-    await exportScene(assets)
+    const result = await exportScene(assets)
+    if (!result.success && result.error) {
+      showNotification(result.error, 'error')
+    }
   }
 
   const handleImport = () => {
@@ -76,6 +85,19 @@ export function Toolbar() {
     }
 
     input.value = ''
+  }
+
+  const handleLoadDroid = async () => {
+    if (!assetLoader) return
+    const base = import.meta.env.BASE_URL || '/'
+    const asset = await assetLoader.loadFromUrl(
+      `${base}gui.usd`,
+      'DROID Robot',
+      { excludeFromExport: true, translucent: true, locked: true }
+    )
+    if (asset) {
+      addAsset(asset)
+    }
   }
 
   return (
@@ -96,6 +118,9 @@ export function Toolbar() {
       </div>
 
       <div class="toolbar-group">
+        <button class="toolbar-btn" onClick={handleLoadDroid}>
+          Load DROID
+        </button>
         <button class="toolbar-btn" onClick={handleAddAsset}>
           Add Asset
         </button>
@@ -124,6 +149,12 @@ export function Toolbar() {
         accept=".zip"
         onChange={handleImportSelect}
       />
+
+      {notification && (
+        <div class={`notification notification-${notification.type}`}>
+          {notification.message}
+        </div>
+      )}
     </div>
   )
 }

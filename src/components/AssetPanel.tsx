@@ -19,19 +19,21 @@ export function AssetPanel() {
             {assets.map((asset) => (
               <div
                 key={asset.id}
-                class={`asset-item ${selectedAsset?.id === asset.id ? 'selected' : ''}`}
-                onClick={() => selectAsset(asset)}
+                class={`asset-item ${selectedAsset?.id === asset.id ? 'selected' : ''} ${asset.locked ? 'locked' : ''}`}
+                onClick={() => !asset.locked && selectAsset(asset)}
               >
-                <span class="asset-item-name">{asset.name}</span>
-                <button
-                  class="asset-item-delete"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeAsset(asset.id)
-                  }}
-                >
-                  x
-                </button>
+                <span class="asset-item-name">{asset.name}{asset.locked ? ' (locked)' : ''}</span>
+                {!asset.locked && (
+                  <button
+                    class="asset-item-delete"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeAsset(asset.id)
+                    }}
+                  >
+                    x
+                  </button>
+                )}
               </div>
             ))}
           </div>

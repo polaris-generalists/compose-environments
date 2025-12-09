@@ -1,7 +1,24 @@
 import JSZip from 'jszip'
 import { LoadedAsset } from '../scene/AssetLoader'
 
-export async function exportScene(assets: LoadedAsset[]): Promise<void> {
+export interface ExportResult {
+  success: boolean
+  error?: string
+}
+
+export async function exportScene(assets: LoadedAsset[]): Promise<ExportResult> {
+  // Filter out assets marked as excludeFromExport
+  const exportableAssets = assets.filter(a => !a.excludeFromExport)
+
+  // Check if at least one asset has gravity disabled
+  const hasKinematicAsset = exportableAssets.some(a => a.disableGravity)
+  if (!hasKinematicAsset) {
+    return {
+      success: false,
+      error: 'At least one asset must have gravity disabled (kinematic) before exporting.'
+    }
+  }
+
   const zip = new JSZip()
   const assetsFolder = zip.folder('assets')
 
@@ -17,7 +34,7 @@ def Xform "World"
 {
 `
 
-  for (const asset of assets) {
+  for (const asset of exportableAssets) {
     // Get transform values (convert Y-up back to Z-up for USD)
     const pos = asset.object.position
     const rot = asset.object.rotation
@@ -39,8 +56,10 @@ def Xform "World"
     // Three.js: X=right, Y=up, Z=forward
     // USD:      X=forward, Y=left, Z=up
     // Mapping: USD_X = Three_X, USD_Y = -Three_Z, USD_Z = Three_Y
+    const kinematicEnabled = asset.disableGravity ? 'true' : 'false'
     usdContent += `
     def Xform "${usdName}" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI"]
         prepend references = @./assets/${asset.name}/${mainFileName}@
     )
     {
@@ -48,6 +67,7 @@ def Xform "World"
         float3 xformOp:rotateXYZ = (${rotDegX}, ${-rotDegZ}, ${rotDegY})
         float3 xformOp:scale = (${scl.x}, ${scl.z}, ${scl.y})
         uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ", "xformOp:scale"]
+        bool physics:kinematicEnabled = ${kinematicEnabled}
     }
 `
 
@@ -73,6 +93,8 @@ def Xform "World"
   // Generate and download
   const blob = await zip.generateAsync({ type: 'blob' })
   downloadBlob(blob, 'scene.zip')
+
+  return { success: true }
 }
 
 function downloadBlob(blob: Blob, filename: string): void {

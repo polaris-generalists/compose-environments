@@ -10,6 +10,9 @@ export interface LoadedAsset {
   files: Map<string, File>
   mainFile: string
   fileType: 'usd' | 'usdz' | 'gltf' | 'glb'
+  excludeFromExport?: boolean
+  locked?: boolean
+  disableGravity?: boolean
 }
 
 type FileType = 'usd' | 'usdz' | 'gltf' | 'glb' | null
@@ -112,14 +115,14 @@ export class AssetLoader {
     }
   }
 
-  private async loadUSDZ(file: File): Promise<THREE.Group> {
+  private async loadUSDZ(file: File, translucent?: boolean): Promise<THREE.Group> {
     const loader = this.getUsdzLoader()
     const innerGroup = new THREE.Group()
     await loader.loadFile(file, innerGroup)
 
     // Assign a unique random color to this asset
     const color = this.generateRandomColor()
-    this.applyColorToMeshes(innerGroup, color)
+    this.applyColorToMeshes(innerGroup, color, translucent)
 
     // USD uses Z-up, Three.js uses Y-up
     // Rotate -90 degrees around X to convert Z-up to Y-up
@@ -139,17 +142,76 @@ export class AssetLoader {
     return new THREE.Color().setHSL(hue, saturation, lightness)
   }
 
-  private applyColorToMeshes(object: THREE.Object3D, color: THREE.Color): void {
+  private applyColorToMeshes(object: THREE.Object3D, color: THREE.Color, translucent?: boolean): void {
     object.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         mesh.material = new THREE.MeshStandardMaterial({
-          color: color,
+          color: translucent ? 0x888888 : color,
           roughness: 0.5,
           metalness: 0.1,
+          transparent: translucent,
+          opacity: translucent ? 0.3 : 1,
+          depthWrite: !translucent,
         })
       }
     })
+  }
+
+  async loadFromUrl(url: string, name: string, options?: { excludeFromExport?: boolean; translucent?: boolean; locked?: boolean }): Promise<LoadedAsset | null> {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const fileName = url.split('/').pop() || 'asset.usd'
+      const file = new File([blob], fileName)
+
+      const lower = fileName.toLowerCase()
+      let fileType: FileType = null
+      if (lower.endsWith('.usdz')) fileType = 'usdz'
+      else if (lower.endsWith('.usd') || lower.endsWith('.usda') || lower.endsWith('.usdc')) fileType = 'usd'
+      else if (lower.endsWith('.glb')) fileType = 'glb'
+      else if (lower.endsWith('.gltf')) fileType = 'gltf'
+
+      if (!fileType) {
+        console.warn('Unsupported file type:', fileName)
+        return null
+      }
+
+      let object: THREE.Object3D
+      if (fileType === 'usdz' || fileType === 'usd') {
+        object = await this.loadUSDZ(file, options?.translucent)
+      } else {
+        const files = new Map<string, File>([[fileName, file]])
+        const gltf = await this.loadGLTF(file, files)
+        object = gltf.scene
+      }
+
+      // Enable shadows on all meshes (skip for translucent)
+      if (!options?.translucent) {
+        object.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true
+            child.receiveShadow = true
+          }
+        })
+      }
+
+      const id = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      return {
+        id,
+        name,
+        object,
+        files: new Map(),
+        mainFile: fileName,
+        fileType,
+        excludeFromExport: options?.excludeFromExport,
+        locked: options?.locked,
+      }
+    } catch (error) {
+      console.error('Failed to load asset from URL:', error)
+      return null
+    }
   }
 
   private loadGLTF(mainFile: File, allFiles: Map<string, File>): Promise<GLTF> {

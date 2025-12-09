@@ -20,6 +20,7 @@ export interface SceneActions {
   selectAsset: (asset: LoadedAsset | null) => void
   setTransformMode: (mode: TransformMode) => void
   updateAssetTransform: (id: string, position: { x: number; y: number; z: number }, rotation: { x: number; y: number; z: number }, scale: { x: number; y: number; z: number }) => void
+  toggleAssetGravity: (id: string) => void
 }
 
 export interface SceneContextValue extends SceneState, SceneActions {}
@@ -98,6 +99,17 @@ export function useSceneProvider(): SceneContextValue {
     }
   }, [assets])
 
+  const toggleAssetGravity = useCallback((id: string) => {
+    setAssets((prev) => {
+      return prev.map((asset) => {
+        if (asset.id === id) {
+          return { ...asset, disableGravity: !asset.disableGravity }
+        }
+        return asset
+      })
+    })
+  }, [])
+
   return {
     sceneManager,
     selectionManager,
@@ -111,6 +123,7 @@ export function useSceneProvider(): SceneContextValue {
     selectAsset,
     setTransformMode,
     updateAssetTransform,
+    toggleAssetGravity,
   }
 }
 

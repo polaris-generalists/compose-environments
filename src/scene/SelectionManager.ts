@@ -109,25 +109,16 @@ export class SelectionManager {
     // Ignore if we're dragging the transform controls
     if (this.transformControls.dragging) return
 
-    console.log('Click detected, assets:', this.assets.length)
-
-    // Debug: log asset structure
-    for (const asset of this.assets) {
-      console.log('Asset:', asset.name)
-      asset.object.traverse((child) => {
-        console.log('  Child:', child.type, (child as THREE.Mesh).isMesh ? '(is mesh)' : '')
-      })
-    }
-
     const rect = this.renderer.domElement.getBoundingClientRect()
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
 
     this.raycaster.setFromCamera(this.mouse, this.camera)
 
-    // Get all meshes from assets
+    // Get all meshes from non-locked assets
     const meshes: THREE.Object3D[] = []
     for (const asset of this.assets) {
+      if (asset.locked) continue
       asset.object.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           meshes.push(child)
@@ -135,21 +126,18 @@ export class SelectionManager {
       })
     }
 
-    console.log('Meshes to check:', meshes.length)
-
     const intersects = this.raycaster.intersectObjects(meshes, false)
-    console.log('Intersects:', intersects.length)
 
     if (intersects.length > 0) {
       // Find which asset owns this mesh
       const hitObject = intersects[0].object
       for (const asset of this.assets) {
+        if (asset.locked) continue
         let found = false
         asset.object.traverse((child) => {
           if (child === hitObject) found = true
         })
         if (found) {
-          console.log('Selecting asset:', asset.name)
           this.select(asset)
           return
         }
