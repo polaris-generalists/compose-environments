@@ -23,6 +23,10 @@ export class SelectionManager {
   private selectedAsset: LoadedAsset | null = null
   private onSelectionChange: ((asset: LoadedAsset | null) => void) | null = null
   private onTransformChange: ((event: TransformChangeEvent) => void) | null = null
+  private highlightBox: THREE.BoxHelper | null = null
+  private boundsMesh: THREE.Mesh | null = null
+  private onBoundsChange: ((mesh: THREE.Mesh) => void) | null = null
+  private isRandomizeMode = false
 
   constructor(
     scene: THREE.Scene,
@@ -48,15 +52,25 @@ export class SelectionManager {
       this.orbitControls.enabled = !event.value
     })
 
-    // Emit transform changes
+    // Emit transform changes and update highlight
     this.transformControls.addEventListener('change', () => {
-      if (this.selectedAsset && this.onTransformChange) {
-        const obj = this.selectedAsset.object
-        this.onTransformChange({
-          position: obj.position.clone(),
-          rotation: obj.rotation.clone(),
-          scale: obj.scale.clone(),
-        })
+      if (this.selectedAsset) {
+        // Update highlight box to follow object
+        this.updateHighlight()
+
+        if (this.onTransformChange) {
+          const obj = this.selectedAsset.object
+          this.onTransformChange({
+            position: obj.position.clone(),
+            rotation: obj.rotation.clone(),
+            scale: obj.scale.clone(),
+          })
+        }
+      }
+
+      // Handle bounds mesh changes in randomize mode
+      if (this.isRandomizeMode && this.boundsMesh && this.onBoundsChange) {
+        this.onBoundsChange(this.boundsMesh)
       }
     })
 
@@ -80,16 +94,41 @@ export class SelectionManager {
   }
 
   select(asset: LoadedAsset | null): void {
+    // Remove previous highlight
+    if (this.highlightBox) {
+      this.scene.remove(this.highlightBox)
+      this.highlightBox.dispose()
+      this.highlightBox = null
+    }
+
     this.selectedAsset = asset
 
     if (asset) {
       this.transformControls.attach(asset.object)
+
+      // Create highlight box that renders on top
+      this.highlightBox = new THREE.BoxHelper(asset.object, 0x00ffff)
+      this.highlightBox.material = new THREE.LineBasicMaterial({
+        color: 0x00ffff,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0.8,
+      })
+      this.highlightBox.renderOrder = 999
+      this.scene.add(this.highlightBox)
     } else {
       this.transformControls.detach()
     }
 
     if (this.onSelectionChange) {
       this.onSelectionChange(asset)
+    }
+  }
+
+  updateHighlight(): void {
+    if (this.highlightBox && this.selectedAsset) {
+      this.highlightBox.update()
     }
   }
 
@@ -105,9 +144,33 @@ export class SelectionManager {
     return this.transformControls.mode as TransformMode
   }
 
+  attachToBoundsMesh(mesh: THREE.Mesh, onBoundsChange: (mesh: THREE.Mesh) => void): void {
+    this.boundsMesh = mesh
+    this.onBoundsChange = onBoundsChange
+    this.isRandomizeMode = true
+    this.transformControls.attach(mesh)
+    this.transformControls.setMode('translate')
+  }
+
+  detachBoundsMesh(): void {
+    this.boundsMesh = null
+    this.onBoundsChange = null
+    this.isRandomizeMode = false
+    this.transformControls.detach()
+  }
+
+  setBoundsTransformMode(mode: 'translate' | 'rotate' | 'scale'): void {
+    if (this.isRandomizeMode) {
+      this.transformControls.setMode(mode)
+    }
+  }
+
   private onClick = (event: MouseEvent): void => {
     // Ignore if we're dragging the transform controls
     if (this.transformControls.dragging) return
+
+    // Ignore clicks in randomize mode - no asset selection allowed
+    if (this.isRandomizeMode) return
 
     const rect = this.renderer.domElement.getBoundingClientRect()
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -176,5 +239,9 @@ export class SelectionManager {
     this.renderer.domElement.removeEventListener('click', this.onClick)
     window.removeEventListener('keydown', this.onKeyDown)
     this.transformControls.dispose()
+    if (this.highlightBox) {
+      this.scene.remove(this.highlightBox)
+      this.highlightBox.dispose()
+    }
   }
 }

@@ -4,8 +4,12 @@ import { TransformMode } from '../scene/SelectionManager'
 import { exportScene } from '../io/exportScene'
 import { importScene } from '../io/importScene'
 
-export function Toolbar() {
-  const { transformMode, setTransformMode, assets, addAsset, assetLoader } = useScene()
+interface ToolbarProps {
+  onHelpClick: () => void
+}
+
+export function Toolbar({ onHelpClick }: ToolbarProps) {
+  const { transformMode, setTransformMode, assets, addAsset, assetLoader, savedConditions, instruction, setSavedConditions, setInstruction } = useScene()
   const folderInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
   const [notification, setNotification] = useState<{ message: string; type: 'error' | 'success' } | null>(null)
@@ -64,7 +68,7 @@ export function Toolbar() {
 
   const handleExport = async () => {
     if (assets.length === 0) return
-    const result = await exportScene(assets)
+    const result = await exportScene(assets, savedConditions, instruction)
     if (!result.success && result.error) {
       showNotification(result.error, 'error')
     }
@@ -79,9 +83,21 @@ export function Toolbar() {
     const file = input.files?.[0]
     if (!file || !assetLoader) return
 
-    const loadedAssets = await importScene(file, assetLoader)
-    for (const asset of loadedAssets) {
+    const result = await importScene(file, assetLoader)
+
+    // Add assets
+    for (const asset of result.assets) {
       addAsset(asset)
+    }
+
+    // Load saved conditions
+    if (result.savedConditions.length > 0) {
+      setSavedConditions(result.savedConditions)
+    }
+
+    // Load instruction
+    if (result.instruction) {
+      setInstruction(result.instruction)
     }
 
     input.value = ''
@@ -103,6 +119,10 @@ export function Toolbar() {
   return (
     <div class="toolbar">
       <span class="toolbar-title">Compose Environments</span>
+
+      <button class="help-btn" onClick={onHelpClick} title="Help">
+        ? Help
+      </button>
 
       <div class="toolbar-group">
         {modes.map(({ mode, label, key }) => (

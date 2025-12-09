@@ -110,29 +110,29 @@ export function PropertyPanel() {
       <div class="panel-header">Properties</div>
       <div class="panel-content">
         <div class="property-group">
-          <div class="property-label">Position</div>
+          <div class="property-label">Position (m)</div>
           <div class="property-row">
-            <Vec3Input value={position} axis="x" onChange={handlePositionChange} />
-            <Vec3Input value={position} axis="y" onChange={handlePositionChange} />
-            <Vec3Input value={position} axis="z" onChange={handlePositionChange} />
+            <Vec3Input value={position} axis="x" onChange={handlePositionChange} step={0.01} />
+            <Vec3Input value={position} axis="y" onChange={handlePositionChange} step={0.01} />
+            <Vec3Input value={position} axis="z" onChange={handlePositionChange} step={0.01} />
           </div>
         </div>
 
         <div class="property-group">
           <div class="property-label">Rotation (degrees)</div>
           <div class="property-row">
-            <Vec3Input value={rotation} axis="x" onChange={handleRotationChange} />
-            <Vec3Input value={rotation} axis="y" onChange={handleRotationChange} />
-            <Vec3Input value={rotation} axis="z" onChange={handleRotationChange} />
+            <Vec3Input value={rotation} axis="x" onChange={handleRotationChange} step={1} />
+            <Vec3Input value={rotation} axis="y" onChange={handleRotationChange} step={1} />
+            <Vec3Input value={rotation} axis="z" onChange={handleRotationChange} step={1} />
           </div>
         </div>
 
         <div class="property-group">
           <div class="property-label">Scale</div>
           <div class="property-row">
-            <Vec3Input value={scale} axis="x" onChange={handleScaleChange} />
-            <Vec3Input value={scale} axis="y" onChange={handleScaleChange} />
-            <Vec3Input value={scale} axis="z" onChange={handleScaleChange} />
+            <Vec3Input value={scale} axis="x" onChange={handleScaleChange} step={0.01} />
+            <Vec3Input value={scale} axis="y" onChange={handleScaleChange} step={0.01} />
+            <Vec3Input value={scale} axis="z" onChange={handleScaleChange} step={0.01} />
           </div>
         </div>
 
@@ -156,9 +156,10 @@ interface Vec3InputProps {
   value: Vec3
   axis: keyof Vec3
   onChange: (axis: keyof Vec3, value: string) => void
+  step?: number
 }
 
-function Vec3Input({ value, axis, onChange }: Vec3InputProps) {
+function Vec3Input({ value, axis, onChange, step = 0.01 }: Vec3InputProps) {
   return (
     <div class="property-input-group">
       <span class="property-input-label">{axis.toUpperCase()}</span>
@@ -166,7 +167,7 @@ function Vec3Input({ value, axis, onChange }: Vec3InputProps) {
         type="number"
         class="property-input"
         value={value[axis]}
-        step={axis === 'x' || axis === 'y' || axis === 'z' ? 0.1 : 1}
+        step={step}
         onChange={(e) => onChange(axis, (e.target as HTMLInputElement).value)}
       />
     </div>
